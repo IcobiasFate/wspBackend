@@ -6,7 +6,6 @@ from datetime import date
 
 app = FastAPI()
 
-
 origins = [
     "http://localhost:3000",  # React frontend URL
     "http://127.0.0.1:3000",  # Alternative localhost URL for React
@@ -20,20 +19,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mock data storage
+# Mock data storage for garages and cars
 garages_db = []
-reports_db = []
+cars_db = []
 
-
-# Input DTOs
+# Input DTOs for Garages and Cars
 class GarageCreateDTO(BaseModel):
     name: str
     location: str
     city: str
     capacity: int
 
+class CarCreateDTO(BaseModel):
+    make: str
+    model: str
+    productionYear: int
+    licensePlate: str
+    garageIds: List[int]  # A list of garage IDs
 
-# Output DTOs
+# Output DTOs for Garages and Cars
 class GarageDTO(BaseModel):
     id: int
     name: str
@@ -41,27 +45,28 @@ class GarageDTO(BaseModel):
     city: str
     capacity: int
 
+class CarDTO(BaseModel):
+    id: int
+    make: str
+    model: str
+    productionYear: int
+    licensePlate: str
+    garages: List[GarageDTO]  # A list of associated garages
 
-class GarageReportEntryDTO(BaseModel):
-    date: date
-    requests: int
-    availableCapacity: int
+# Service functions for interacting with garages and cars databases
 
-
-# Service functions for interacting with the database
+# Garage-related functions
 def get_garage_by_id(garage_id: int) -> Optional[GarageDTO]:
     for garage in garages_db:
         if garage.id == garage_id:
             return garage
     return None
 
-
 def add_garage_to_db(garage_create_dto: GarageCreateDTO) -> GarageDTO:
     garage_id = len(garages_db) + 1  # Assign the id to the new garage
-    new_garage = GarageDTO(id=garage_id, **garage_create_dto.dict())  # Create a GarageDTO from the input
+    new_garage = GarageDTO(id=garage_id, **garage_create_dto.dict())
     garages_db.append(new_garage)
     return new_garage
-
 
 def update_garage_in_db(garage_id: int, garage_dto: GarageDTO) -> Optional[GarageDTO]:
     for index, existing_garage in enumerate(garages_db):
@@ -70,13 +75,42 @@ def update_garage_in_db(garage_id: int, garage_dto: GarageDTO) -> Optional[Garag
             return garage_dto
     return None
 
-
 def delete_garage_from_db(garage_id: int) -> Optional[GarageDTO]:
     for index, garage in enumerate(garages_db):
         if garage.id == garage_id:
             return garages_db.pop(index)
     return None
 
+# Car-related functions
+def get_car_by_id(car_id: int) -> Optional[CarDTO]:
+    for car in cars_db:
+        if car.id == car_id:
+            return car
+    return None
+
+def add_car_to_db(car_create_dto: CarCreateDTO) -> CarDTO:
+    car_id = len(cars_db) + 1
+    new_car = CarDTO(id=car_id, **car_create_dto.dict(), garages=[])
+    # Assign garages to car based on garage IDs
+    for garage_id in car_create_dto.garageIds:
+        garage = get_garage_by_id(garage_id)
+        if garage:
+            new_car.garages.append(garage)
+    cars_db.append(new_car)
+    return new_car
+
+def update_car_in_db(car_id: int, car_dto: CarDTO) -> Optional[CarDTO]:
+    for index, existing_car in enumerate(cars_db):
+        if existing_car.id == car_id:
+            cars_db[index] = car_dto
+            return car_dto
+    return None
+
+def delete_car_from_db(car_id: int) -> Optional[CarDTO]:
+    for index, car in enumerate(cars_db):
+        if car.id == car_id:
+            return cars_db.pop(index)
+    return None
 
 # Routes for managing garages
 @app.get("/garages", response_model=List[GarageDTO])
@@ -86,12 +120,10 @@ async def get_garages(city: Optional[str] = None):
         return filtered_garages
     return garages_db
 
-
 @app.post("/garages", response_model=GarageDTO)
 async def add_garage(garage_create_dto: GarageCreateDTO):
     garage = add_garage_to_db(garage_create_dto)
     return garage
-
 
 @app.put("/garages/{garage_id}", response_model=GarageDTO)
 async def update_garage(garage_id: int, garage_dto: GarageCreateDTO):
@@ -108,7 +140,6 @@ async def update_garage(garage_id: int, garage_dto: GarageCreateDTO):
 
     return updated_garage
 
-
 @app.delete("/garages/{garage_id}", response_model=GarageDTO)
 async def delete_garage(garage_id: int):
     removed_garage = delete_garage_from_db(garage_id)
@@ -116,14 +147,44 @@ async def delete_garage(garage_id: int):
         raise HTTPException(status_code=404, detail="Garage not found")
     return removed_garage
 
+# Routes for managing cars
+@app.get("/cars", response_model=List[CarDTO])
+async def get_cars():
+    return cars_db
 
-# Route for fetching garage reports
-@app.get("/garages/dailyAvailabilityReport", response_model=List[GarageReportEntryDTO])
-async def get_garage_report(garageId: int, start_date: date, end_date: date):
-    #data for testing
-    reports_db.append(GarageReportEntryDTO(date=date.today(), requests=10, availableCapacity=50))
+@app.post("/cars", response_model=CarDTO)
+async def add_car(car_create_dto: CarCreateDTO):
+    car = add_car_to_db(car_create_dto)
+    return car
 
-    filtered_reports = [
-        report for report in reports_db if report.date >= start_date and report.date <= end_date
-    ]
-    return filtered_reports
+@app.put("/cars/{car_id}", response_model=CarDTO)
+async def update_car(car_id: int, car_dto: CarCreateDTO):
+    existing_car = get_car_by_id(car_id)
+    if not existing_car:
+        raise HTTPException(status_code=404, detail="Car not found")
+
+    updated_car = CarDTO(id=car_id, **car_dto.dict(), garages=[])
+    # Assign updated garages based on garage IDs
+    for garage_id in car_dto.garageIds:
+        garage = get_garage_by_id(garage_id)
+        if garage:
+            updated_car.garages.append(garage)
+
+    updated_car = update_car_in_db(car_id, updated_car)
+    if not updated_car:
+        raise HTTPException(status_code=404, detail="Car not found")
+
+    return updated_car
+
+@app.delete("/cars/{car_id}", response_model=CarDTO)
+async def delete_car(car_id: int):
+    removed_car = delete_car_from_db(car_id)
+    if not removed_car:
+        raise HTTPException(status_code=404, detail="Car not found")
+    return removed_car
+
+# Route for fetching car reports (example for testing)
+@app.get("/cars/dailyAvailabilityReport", response_model=List[GarageDTO])
+async def get_car_report(start_date: date, end_date: date):
+
+    return garages_db
