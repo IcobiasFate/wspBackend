@@ -149,8 +149,28 @@ async def delete_garage(garage_id: int):
 
 # Routes for managing cars
 @app.get("/cars", response_model=List[CarDTO])
-async def get_cars():
-    return cars_db
+async def get_cars(carMake: Optional[str] = None,
+                   garageId: Optional[int] = None,
+                   fromYear: Optional[int] = None,
+                   toYear: Optional[int] = None):
+    # Start with the full list of cars
+    filtered_cars = cars_db  # Assume cars_db is the list or database of cars
+
+    # Apply filters based on the query parameters
+    if carMake:
+        filtered_cars = [car for car in filtered_cars if car.make.lower() == carMake.lower()]
+
+    if garageId:
+        filtered_cars = [car for car in filtered_cars if any(garage.id == garageId for garage in car.garages)]
+
+    if fromYear:
+        filtered_cars = [car for car in filtered_cars if car.productionYear >= fromYear]
+
+    if toYear:
+        filtered_cars = [car for car in filtered_cars if car.productionYear <= toYear]
+
+    # Return the filtered list of cars
+    return filtered_cars
 
 @app.post("/cars", response_model=CarDTO)
 async def add_car(car_create_dto: CarCreateDTO):
