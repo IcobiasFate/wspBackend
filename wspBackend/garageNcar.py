@@ -22,7 +22,7 @@ app.add_middleware(
 # Mock data storage
 garages_db = []
 cars_db = []
-maintenance_db = []
+
 
 # Input DTOs
 class GarageCreateDTO(BaseModel):
@@ -38,11 +38,7 @@ class CarCreateDTO(BaseModel):
     licensePlate: str
     garageIds: List[int]  # A list of garage IDs
 
-class MaintenanceCreateDTO(BaseModel):
-    carId: int
-    date: date
-    description: str
-    cost: float
+
 
 # Output DTOs
 class GarageDTO(BaseModel):
@@ -61,12 +57,6 @@ class CarDTO(BaseModel):
     garages: List[GarageDTO]  # A list of associated garages
 
 
-class MaintenanceDTO(BaseModel):
-    id: int
-    carId: int
-    date: date
-    description: str
-    cost: float
 
 
 # Garage-related functions
@@ -127,31 +117,7 @@ def delete_car_from_db(car_id: int) -> Optional[CarDTO]:
     return None
 
 
-# Maintenance-related functions (not working)
-def get_maintenance_by_id(maintenance_id: int) -> Optional[MaintenanceDTO]:
-    for maintenance in maintenance_db:
-        if maintenance.id == maintenance_id:
-            return maintenance
-    return None
 
-def add_maintenance_to_db(maintenance_create_dto: MaintenanceCreateDTO) -> MaintenanceDTO:
-    maintenance_id = len(maintenance_db) + 1
-    new_maintenance = MaintenanceDTO(id=maintenance_id, **maintenance_create_dto.dict())
-    maintenance_db.append(new_maintenance)
-    return new_maintenance
-
-def update_maintenance_in_db(maintenance_id: int, maintenance_dto: MaintenanceDTO) -> Optional[MaintenanceDTO]:
-    for index, existing_maintenance in enumerate(maintenance_db):
-        if existing_maintenance.id == maintenance_id:
-            maintenance_db[index] = maintenance_dto
-            return maintenance_dto
-    return None
-
-def delete_maintenance_from_db(maintenance_id: int) -> Optional[MaintenanceDTO]:
-    for index, maintenance in enumerate(maintenance_db):
-        if maintenance.id == maintenance_id:
-            return maintenance_db.pop(index)
-    return None
 # Garage route
 @app.get("/garages", response_model=List[GarageDTO])
 async def get_garages(city: Optional[str] = None):
