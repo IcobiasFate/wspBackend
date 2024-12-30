@@ -19,11 +19,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mock data storage for garages and cars
+# Mock data storage
 garages_db = []
 cars_db = []
+maintenance_db = []
 
-# Input DTOs for Garages and Cars
+# Input DTOs
 class GarageCreateDTO(BaseModel):
     name: str
     location: str
@@ -37,7 +38,13 @@ class CarCreateDTO(BaseModel):
     licensePlate: str
     garageIds: List[int]  # A list of garage IDs
 
-# Output DTOs for Garages and Cars
+class MaintenanceCreateDTO(BaseModel):
+    carId: int
+    date: date
+    description: str
+    cost: float
+
+# Output DTOs
 class GarageDTO(BaseModel):
     id: int
     name: str
@@ -53,7 +60,14 @@ class CarDTO(BaseModel):
     licensePlate: str
     garages: List[GarageDTO]  # A list of associated garages
 
-# Service functions for interacting with garages and cars databases
+
+class MaintenanceDTO(BaseModel):
+    id: int
+    carId: int
+    date: date
+    description: str
+    cost: float
+
 
 # Garage-related functions
 def get_garage_by_id(garage_id: int) -> Optional[GarageDTO]:
@@ -112,7 +126,33 @@ def delete_car_from_db(car_id: int) -> Optional[CarDTO]:
             return cars_db.pop(index)
     return None
 
-# Routes for managing garages
+
+# Maintenance-related functions (not working)
+def get_maintenance_by_id(maintenance_id: int) -> Optional[MaintenanceDTO]:
+    for maintenance in maintenance_db:
+        if maintenance.id == maintenance_id:
+            return maintenance
+    return None
+
+def add_maintenance_to_db(maintenance_create_dto: MaintenanceCreateDTO) -> MaintenanceDTO:
+    maintenance_id = len(maintenance_db) + 1
+    new_maintenance = MaintenanceDTO(id=maintenance_id, **maintenance_create_dto.dict())
+    maintenance_db.append(new_maintenance)
+    return new_maintenance
+
+def update_maintenance_in_db(maintenance_id: int, maintenance_dto: MaintenanceDTO) -> Optional[MaintenanceDTO]:
+    for index, existing_maintenance in enumerate(maintenance_db):
+        if existing_maintenance.id == maintenance_id:
+            maintenance_db[index] = maintenance_dto
+            return maintenance_dto
+    return None
+
+def delete_maintenance_from_db(maintenance_id: int) -> Optional[MaintenanceDTO]:
+    for index, maintenance in enumerate(maintenance_db):
+        if maintenance.id == maintenance_id:
+            return maintenance_db.pop(index)
+    return None
+# Garage route
 @app.get("/garages", response_model=List[GarageDTO])
 async def get_garages(city: Optional[str] = None):
     if city:
@@ -131,7 +171,7 @@ async def update_garage(garage_id: int, garage_dto: GarageCreateDTO):
     if not existing_garage:
         raise HTTPException(status_code=404, detail="Garage not found")
 
-    # Convert the incoming DTO into a GarageDTO for the response
+
     updated_garage = GarageDTO(id=garage_id, **garage_dto.dict())
     updated_garage = update_garage_in_db(garage_id, updated_garage)
 
@@ -147,16 +187,16 @@ async def delete_garage(garage_id: int):
         raise HTTPException(status_code=404, detail="Garage not found")
     return removed_garage
 
-# Routes for managing cars
+# Car routes
 @app.get("/cars", response_model=List[CarDTO])
 async def get_cars(carMake: Optional[str] = None,
                    garageId: Optional[int] = None,
                    fromYear: Optional[int] = None,
                    toYear: Optional[int] = None):
-    # Start with the full list of cars
-    filtered_cars = cars_db  # Assume cars_db is the list or database of cars
 
-    # Apply filters based on the query parameters
+    filtered_cars = cars_db
+
+    # Apply filters
     if carMake:
         filtered_cars = [car for car in filtered_cars if car.make.lower() == carMake.lower()]
 
@@ -169,7 +209,7 @@ async def get_cars(carMake: Optional[str] = None,
     if toYear:
         filtered_cars = [car for car in filtered_cars if car.productionYear <= toYear]
 
-    # Return the filtered list of cars
+
     return filtered_cars
 
 @app.post("/cars", response_model=CarDTO)
@@ -203,7 +243,10 @@ async def delete_car(car_id: int):
         raise HTTPException(status_code=404, detail="Car not found")
     return removed_car
 
-# Route for fetching car reports (example for testing)
+
+
+
+
 @app.get("/cars/dailyAvailabilityReport", response_model=List[GarageDTO])
 async def get_car_report(start_date: date, end_date: date):
 
